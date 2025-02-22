@@ -6,7 +6,7 @@ OBJS = $(SRCS:.c=.o)
 
 all: $(NAME)
 
-$(NAME):
+$(NAME): $(OBJS)
 	$(CC) -o $(NAME) $(SRCS) $(CFLAGS)
 
 %.o: %.c

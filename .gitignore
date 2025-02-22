@@ -1,2 +1,4 @@
 ft_lex
 lex.yy.c
+*.o
+*.swp
