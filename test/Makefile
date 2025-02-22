@@ -4,7 +4,7 @@ run:
 	./test.sh
 
 clean:
-	$(RM) lexcmp.yy.c scanner_cmp cmp.txt
+	$(RM) lex{,cmp}.yy.c scanner_{cmp,ft} {ft,cmp}.txt
 
 re: clean run
 
