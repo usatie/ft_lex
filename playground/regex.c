@@ -1,3 +1,12 @@
+/*
+ * regex.c
+ *
+ * This program is a C implementation of regex matcher heavily inspired by Rob
+ * Pike's implementation.
+ *
+ * A Regular Expression Matcher Code by Rob Pike
+ * https://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
+ */
 #include <stdio.h>
 #include <unistd.h> // STDERR_FILENO
 
