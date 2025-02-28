@@ -58,3 +58,8 @@ expect_no_match "aab*cc" "aacaacaac"
 expect_match ".*" "abc"
 expect_match "a.*c" "a0123456789c"
 expect_match "a.*c" "ac"
+
+# +
+expect_no_match "ohh+" "oh"
+expect_match "ohh+" "ohh"
+expect_match "ohh+" "ohhhhh"
