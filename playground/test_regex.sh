@@ -24,6 +24,7 @@ expect_no_match() {
 	fi
 }
 
+# Normal Characters
 expect_match "a" "a"
 expect_no_match "a" "b"
 expect_match "b" "abc"
@@ -32,7 +33,17 @@ expect_match "abc" "abcabc"
 expect_match "abc" "zzzabczzz"
 expect_match "abc" "zzzabc"
 expect_no_match "abc" "zzzab"
+
+# Wildcard
 expect_match "a.c" "abc"
 expect_match "a.c" "azc"
 expect_match "." "a"
 expect_no_match "." ""
+
+# Kleene Star
+expect_match "a*" ""
+expect_match "a*" "a"
+expect_match "a*" "aa"
+expect_no_match "a*" "b"
+expect_match "a*b" "b"
+expect_no_match "a*b" "c"
