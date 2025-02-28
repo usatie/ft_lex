@@ -16,8 +16,9 @@ int regex_match(const char *pattern, const char *string) {
       // 3. Normal Character : The first character match, try next
       ++p, ++s;
     } else {
-      // No match from the current string
-      return regex_match(pattern, string + 1);
+      // No match from the string, advance
+      p = pattern;
+      s = ++string;
     }
   }
 }
