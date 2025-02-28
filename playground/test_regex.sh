@@ -54,3 +54,7 @@ expect_match "aab*cc" "aaabcc"
 expect_match "aab*cc" "aabbbbbcc"
 expect_match "aab*cc" "aacaacaacc"
 expect_no_match "aab*cc" "aacaacaac"
+
+expect_match ".*" "abc"
+expect_match "a.*c" "a0123456789c"
+expect_match "a.*c" "ac"
