@@ -6,6 +6,7 @@
 
 #define STATE_EOF 256
 #define STATE_WILD 257
+#define STATE_SPLIT 258
 typedef struct state {
   int c;
   struct state *out;
@@ -22,6 +23,14 @@ state *state_new(int c, state *out, state *out1) {
   return s;
 }
 
+// ab*c*d
+// a ->  b*    +--eps-->  c*    +--eps-->  d
+//       ^--b--|          ^--c--|
+
+// abc -> abc..
+// ab*c -> ab*c..
+// a|bcde -> ab|cde...
+
 state *regex_compile(const char *regexp) {
   state head = {};
   state *sp = &head;
@@ -30,10 +39,26 @@ state *regex_compile(const char *regexp) {
     if (c == '.') {
       c = STATE_WILD;
     }
-    sp = sp->out = state_new(c, NULL, NULL);
-    ++regexp;
+    state *new_s;
+    if (regexp[1] == '*') {
+      new_s = state_new(c, NULL /* to be filled */, NULL /* self */);
+      new_s->out = new_s;
+      regexp += 2;
+    } else {
+      new_s = state_new(c, NULL, NULL);
+      ++regexp;
+    }
+    if (sp->out == NULL) {
+      sp = sp->out = new_s;
+    } else {
+      sp = sp->out1 = new_s;
+    }
   }
-  sp->out = state_new(STATE_EOF, NULL, NULL);
+  if (sp->out == NULL) {
+    sp = sp->out = state_new(STATE_EOF, NULL, NULL);
+  } else {
+    sp = sp->out1 = state_new(STATE_EOF, NULL, NULL);
+  }
   return head.out;
 }
 
@@ -51,6 +76,9 @@ void append(state **state_list, state *next) {
   // Append state to the list
   int i;
   for (i = 0; state_list[i]; ++i) {
+    if (state_list[i] == next) {
+      return;
+    }
   }
   state_list[i] = next;
   state_list[i + 1] = NULL;
@@ -74,9 +102,16 @@ int regex_matchhere(state *s, const char *text) {
         return 1;
       }
       if (s->c == *text || (*text && s->c == STATE_WILD)) {
-        append(nlist, s->out); // If match, append the next state to the nlist
-      } else {
-        continue; // fail, simply try the next entry in the CLIST
+        // If match, append the next state to the nlist
+        if (s->out1 == NULL) {
+          append(nlist, s->out);
+        } else {
+          append(nlist, s->out1);
+        }
+      }
+      if (s->out1) {
+        // If there is another branch, try it
+        append(nlist, s->out);
       }
     }
     swap(&clist, &nlist);
