@@ -1,30 +1,24 @@
 #include <stdio.h>
 
 int regex_match(const char *pattern, const char *string) {
-  const char *s = string;
+  const char *s = string, *p = pattern;
   while (1) {
     // Pattern exauhsted, it's a match
-    if (pattern[0] == '\0') {
+    if (p[0] == '\0') {
       return 1;
-    }
-    // 1. Wildcard : Try to match the rest of the string
-    if (pattern[0] == '.' && s[0]) {
-      if (regex_match(pattern + 1, s + 1)) {
-        return 1;
-      }
-    }
-    // 2. Normal Character : The first character match, try next
-    if (s[0] == pattern[0]) {
-      if (regex_match(pattern + 1, s + 1)) {
-        return 1;
-      }
-    }
-    // String exhausted, no match
-    if (s[0] == '\0') {
+    } else if (s[0] == '\0') {
+      // 1. String exhausted, no match
       return 0;
+    } else if (p[0] == '.') {
+      // 2. Wildcard : Try to match the rest of the string
+      ++p, ++s;
+    } else if (s[0] == p[0]) {
+      // 3. Normal Character : The first character match, try next
+      ++p, ++s;
+    } else {
+      // No match from the current string
+      return regex_match(pattern, string + 1);
     }
-    // If it there is no match from here. Try moving to the next
-    ++s;
   }
 }
 
