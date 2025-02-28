@@ -33,6 +33,7 @@ expect_match "abc" "abcabc"
 expect_match "abc" "zzzabczzz"
 expect_match "abc" "zzzabc"
 expect_no_match "abc" "zzzab"
+expect_no_match "abc" "azzzbzzzc"
 
 # Wildcard
 expect_match "a.c" "abc"
