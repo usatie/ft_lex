@@ -7,7 +7,13 @@ int regex_match(const char *pattern, const char *string) {
     if (pattern[0] == '\0') {
       return 1;
     }
-    // The first character match, try next
+    // 1. Wildcard : Try to match the rest of the string
+    if (pattern[0] == '.' && s[0]) {
+      if (regex_match(pattern + 1, s + 1)) {
+        return 1;
+      }
+    }
+    // 2. Normal Character : The first character match, try next
     if (s[0] == pattern[0]) {
       if (regex_match(pattern + 1, s + 1)) {
         return 1;
