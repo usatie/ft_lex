@@ -1,3 +1,5 @@
 regex_compiler
 regex
+regex_compiler_thompson
+regex_rob_pike
 *.out
