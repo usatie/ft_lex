@@ -9,7 +9,10 @@ regex_compiler_thompson: regex_compiler_thompson.cpp
 regex_rob_pike: regex_rob_pike.c
 	$(CC) -o regex_rob_pike regex_rob_pike.c
 
-test: regex_rob_pike
+regex_compiler: regex_compiler.c
+	$(CXX) -o regex regex_compiler.c
+
+test: regex
 	./test_regex.sh
 
 clean:
