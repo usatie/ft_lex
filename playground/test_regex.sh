@@ -1,11 +1,16 @@
 #!/bin/bash
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+RESET='\033[0m'
+
 expect_match() {
 	pattern=$1
 	string=$2
 	if ./regex "$pattern" "$string"; then
-		echo "OK: $pattern in $string"
+		echo -e "$GREEN""OK""$RESET: $pattern in $string"
 	else
-		echo "NG: $pattern not in $string"
+		echo -e "$RED""NG""$RESET: $pattern not in $string"
 	fi
 }
 
@@ -13,9 +18,9 @@ expect_no_match() {
 	pattern=$1
 	string=$2
 	if ./regex "$pattern" "$string"; then
-		echo "NG: $pattern in $string"
+		echo -e "$RED""NG""$RESET: $pattern in $string"
 	else
-		echo "OK: $pattern not in $string"
+		echo -e "$GREEN""OK""$RESET: $pattern not in $string"
 	fi
 }
 
@@ -27,3 +32,7 @@ expect_match "abc" "abcabc"
 expect_match "abc" "zzzabczzz"
 expect_match "abc" "zzzabc"
 expect_no_match "abc" "zzzab"
+expect_match "a.c" "abc"
+expect_match "a.c" "azc"
+expect_match "." "a"
+expect_no_match "." ""
