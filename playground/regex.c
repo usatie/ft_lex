@@ -1,22 +1,25 @@
 #include <stdio.h>
 
 int regex_match(const char *pattern, const char *string) {
-  const char *p = string;
-  do {
+  const char *s = string;
+  while (1) {
     // Pattern exauhsted, it's a match
     if (pattern[0] == '\0') {
       return 1;
     }
     // The first character match, try next
-    if (p[0] == pattern[0]) {
-      if (regex_match(pattern + 1, p + 1)) {
+    if (s[0] == pattern[0]) {
+      if (regex_match(pattern + 1, s + 1)) {
         return 1;
       }
     }
+    // String exhausted, no match
+    if (s[0] == '\0') {
+      return 0;
+    }
     // If it there is no match from here. Try moving to the next
-    ++p;
-  } while (*p);
-  return 0;
+    ++s;
+  }
 }
 
 int main(int argc, const char *argv[]) {
@@ -28,8 +31,8 @@ int main(int argc, const char *argv[]) {
   const char *pattern = argv[1];
   const char *string = argv[2];
   if (regex_match(pattern, string)) {
-    printf("Match\n");
+    return 0;
   } else {
-    printf("No match\n");
+    return 1;
   }
 }

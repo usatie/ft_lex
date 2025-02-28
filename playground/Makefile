@@ -6,6 +6,4 @@ regex_compiler: regex_compiler.cpp
 
 regex: regex.c
 	$(CC) -o regex regex.c
-	./regex abc aaa
-	./regex abc abc
-	./regex abc zzzabcdefgzzz
+	./test_regex.sh
