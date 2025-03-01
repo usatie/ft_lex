@@ -4,137 +4,182 @@
 #include <string.h>
 #include <unistd.h> // STDERR_FILENO
 
-#define STATE_EOF 256
-#define STATE_WILD 257
-#define STATE_SPLIT 258
-typedef struct state {
+enum { Match = 256, Split = 257 };
+typedef struct State State;
+struct State {
   int c;
-  struct state *out;
-  struct state *out1;
-} state;
-int regex_match(state *s, const char *text);
-int regex_matchhere(state *s, const char *text);
+  State *out;
+  State *out1;
+};
 
-state *state_new(int c, state *out, state *out1) {
-  state *s = malloc(sizeof(state));
+State matchstate = {Match}; // matching state
+int nstate = 0;
+
+/* Allocate and initialize state */
+State *state(int c, State *out, State *out1) {
+  State *s;
+
+  nstate++;
+  s = malloc(sizeof *s);
   s->c = c;
   s->out = out;
   s->out1 = out1;
   return s;
 }
 
-// ab*c*d
-// a ->  b*    +--eps-->  c*    +--eps-->  d
-//       ^--b--|          ^--c--|
+/*
+ * A partially built NFA without the matching state filled in.
+ * Frag.start points at the start state.
+ * Frag.out is a list of places that need to be set to the next state for this
+ * fragment.
+ */
+typedef struct Frag Frag;
+typedef union Ptrlist Ptrlist;
+struct Frag {
+  State *start;
+  Ptrlist *out;
+};
 
-// abc -> abc..
-// ab*c -> ab*c..
-// a|bcde -> ab|cde...
-
-state *regex_compile(const char *regexp) {
-  state head = {};
-  state *sp = &head;
-  while (*regexp) {
-    int c = *regexp;
-    if (c == '.') {
-      c = STATE_WILD;
-    }
-    state *new_s;
-    if (regexp[1] == '*') {
-      new_s = state_new(c, NULL /* to be filled */, NULL /* self */);
-      new_s->out = new_s;
-      regexp += 2;
-    } else {
-      new_s = state_new(c, NULL, NULL);
-      ++regexp;
-    }
-    if (sp->out == NULL) {
-      sp = sp->out = new_s;
-    } else {
-      sp = sp->out1 = new_s;
-    }
-  }
-  if (sp->out == NULL) {
-    sp = sp->out = state_new(STATE_EOF, NULL, NULL);
-  } else {
-    sp = sp->out1 = state_new(STATE_EOF, NULL, NULL);
-  }
-  return head.out;
+/* Initialize Frag struct. */
+Frag frag(State *start, Ptrlist *out) {
+  Frag n = {start, out};
+  return n;
 }
 
-int regex_match(state *s, const char *text) {
-  do {
-    // check if regexp matches text
-    if (regex_matchhere(s, text)) {
-      return 1;
+/*
+ * Since the out pointers in the list are always
+ * uninitialized, we use the pointers themselves
+ * as storage for the Ptrlists.
+ */
+union Ptrlist {
+  Ptrlist *next;
+  State *s;
+};
+
+/* Create singleton list containing just outp */
+// これはなんだ？シングルトン？
+// outpはState**として渡されているものの、作成直後のstate(c, NULL, NULL)のなかの
+// NULLが入っているだけの場所なので、自由な値を一旦入れておいてOK
+Ptrlist *list1(State **outp) {
+  Ptrlist *l;
+
+  l = (Ptrlist *)outp;
+  l->next = NULL;
+  return l;
+}
+
+/* Patch the list of states at out to point to start. */
+// つまりこれはpatchするまではlistとしての体をなしているけど、
+// patchした後はただのstateになっていてnextへのポインタは失われてしまうので
+// listとして機能しないということ？
+void patch(Ptrlist *l, State *s) {
+  Ptrlist *next;
+
+  for (; l; l = next) {
+    next = l->next;
+    // *((State **)l) = s; とおなじ？
+    l->s = s;
+  }
+}
+
+/* Join the two lists l1 and l2, returning the combination. */
+Ptrlist *append(Ptrlist *l1, Ptrlist *l2) {
+  Ptrlist *oldl1;
+
+  oldl1 = l1;
+  while (l1->next) {
+    l1 = l1->next;
+  }
+  l1->next = l2;
+  return oldl1;
+}
+
+/*
+ * Convert postfix regular expression to NFA.
+ * Return start state.
+ */
+
+State *post2nfa(char *postfix) {
+  char *p;
+  Frag stack[1000], *stackp, e1, e2, e;
+  State *s;
+
+  fprintf(stderr, "postfix: %s\n", postfix);
+
+  if (postfix == NULL) {
+    return NULL;
+  }
+#define push(s) *stackp++ = s
+#define pop() *--stackp
+  stackp = stack;
+  for (p = postfix; *p; p++) {
+    switch (*p) {
+    default:
+      s = state(*p, NULL, NULL); // 'a' みたいなstateを作って、
+      push(frag(
+          s,
+          list1(
+              &s->out))); // state('a')のoutはあとで更新してねってことでpushしておく
+      break;
+    case '.': /* concatenate */
+      e2 = pop();
+      e1 = pop();
+      // Q. e1.out = e2.startみたいにするのとはどう違う?
+      patch(
+          e1.out,
+          e2.start); // e1が既に複合的なstateの可能性があるので、outにすぐにpatchできるといい？
+      push(frag(
+          e1.start,
+          e2.out)); // 既に連結している複数stateも頭とお尻だけ見えるからいいのか？
+      break;
+    case '|': /* alternate */
+      e2 = pop();
+      e1 = pop();
+      s = state(Split, e1.start, e2.start);
+      push(frag(
+          s,
+          append(
+              e1.out,
+              e2.out))); // a|b c|d eみたいな分岐がある場合には
+                         // a->c
+                         // a->d
+                         // b->c
+                         // b->d
+                         // の全ての後ろに次のeを連結したいから、こういう仕組みが必要
+    case '?': /* zero or one */
+      e = pop();
+      s = state(Split, e.start, NULL); // (abc)?dみたいな場合,
+                                       // 以下の2つの分岐を試したい s-> (abc) ->
+                                       // d s-> d
+      push(frag(s, append(e.out, list1(&s->out1))));
+      break;
+    case '*': /* zero or more */
+      e = pop();
+      s = state(Split, e.start, NULL); // (abc)*d
+                                       // s -> (abc) -> s
+                                       // s -> d
+      patch(e.out, s);
+      push(frag(s, list1(&s->out1)));
+      break;
+    case '+': /* one or more */
+      e = pop();
+      s = state(Split, e.start, NULL); // (abc)+dの場合
+                                       // abc -> s -> abc
+                                       // abc -> s -> d
+      patch(e.out, s);
+      push(frag(e.start, list1(&s->out1)));
+      break;
     }
-  } while (*(text++) != '\0');
-  return 0;
-}
-
-void append(state **state_list, state *next) {
-  // Append state to the list
-  int i;
-  for (i = 0; state_list[i]; ++i) {
-    if (state_list[i] == next) {
-      return;
-    }
   }
-  state_list[i] = next;
-  state_list[i + 1] = NULL;
-}
-
-state *list1[128] = {}, *list2[128] = {};
-
-void swap(void *a, void *b) {
-  void *c = *(void **)a;
-  *(void **)a = *(void **)b;
-  *(void **)b = c;
-}
-
-int regex_matchhere(state *s, const char *text) {
-  state **clist = list1, **nlist = list2;
-  clist[0] = s;
-  while (clist[0]) {
-    for (int i = 0; clist[i]; ++i) {
-      s = clist[i];
-      if (s->c == STATE_EOF) {
-        return 1;
-      }
-      if (s->c == *text || (*text && s->c == STATE_WILD)) {
-        // If match, append the next state to the nlist
-        if (s->out1 == NULL) {
-          append(nlist, s->out);
-        } else {
-          append(nlist, s->out1);
-        }
-      }
-      if (s->out1) {
-        // If there is another branch, try it
-        append(nlist, s->out);
-      }
-    }
-    swap(&clist, &nlist);
-    nlist[0] = NULL;
-    ++text;
+  e = pop();
+  if (stackp !=
+      stack) { // stack should be empty after compilation. if not, invalid input
+    return NULL;
   }
-  return 0;
+  patch(e.out, &matchstate);
+  return e.start;
+#undef pop
+#undef push
 }
 
-int main(int argc, const char *argv[]) {
-  if (argc != 3) {
-    dprintf(STDERR_FILENO, "Usage: %s <pattern> <string>\n", argv[0]);
-    return 1;
-  }
-  const char *regexp = argv[1];
-  const char *text = argv[2];
-
-  // First compile the state machine
-  state *s = regex_compile(regexp);
-  // Second, run the state machine against the input text
-  if (regex_match(s, text)) {
-    return 0;
-  } else {
-    return 1;
-  }
-}
+int main(void) {}
