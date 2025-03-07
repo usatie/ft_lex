@@ -3,3 +3,4 @@ lex.yy.c
 *.o
 *.swp
 .pre-commit-config.yaml
+a.out
